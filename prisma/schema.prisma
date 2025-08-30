@@ -1,0 +1,127 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  directUrl  = env("DIRECT_URL")
+  extensions = [pgvector]
+}
+
+// Enums
+
+enum SessionStatus {
+  ACTIVE
+  TERMINATED
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+}
+
+// Models
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  accounts      Account[]
+  sessions      Session[]
+  memories      Memory[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Session {
+  id                  String        @id @default(cuid())
+  userId              String
+  personaId           String
+  status              SessionStatus @default(ACTIVE)
+  clientCapabilityFlags Json?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  persona  Persona   @relation(fields: [personaId], references: [id])
+  messages Message[]
+  memories Memory[]
+
+  @@index([userId])
+  @@index([personaId])
+}
+
+model Persona {
+  id             String    @id @default(cuid())
+  name           String
+  systemPrompt   String
+  defaultVoiceId String?
+  sessions       Session[]
+}
+
+model Message {
+  id        String      @id @default(cuid())
+  sessionId String
+  role      MessageRole
+  content   String
+  metadata  Json?
+  createdAt DateTime    @default(now())
+
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+}
+
+model Memory {
+  id        String   @id @default(cuid())
+  userId    String?
+  sessionId String?
+  content   String
+  embedding Unsupported("vector(1536)")
+  createdAt DateTime @default(now())
+
+  user    User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  session Session? @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([sessionId])
+}
+
+model ModerationLog {
+  id        String   @id @default(cuid())
+  content   String
+  flaggedAt DateTime @default(now())
+}
