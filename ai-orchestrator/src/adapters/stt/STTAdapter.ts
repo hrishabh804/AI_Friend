@@ -4,5 +4,8 @@ export interface STTResponse {
 }
 
 export interface STTAdapter {
-  stream(audio: AsyncIterable<Buffer>): AsyncIterable<STTResponse>;
+  stream(
+    audio: AsyncIterable<Buffer>,
+    sessionId: string
+  ): AsyncIterable<STTResponse>;
 }

@@ -11,7 +11,10 @@ export class GoogleSTTAdapter implements STTAdapter {
     this.redisPublisher = redis.duplicate();
   }
 
-  async *stream(audio: AsyncIterable<Buffer>): AsyncIterable<STTResponse> {
+  async *stream(
+    audio: AsyncIterable<Buffer>,
+    sessionId: string
+  ): AsyncIterable<STTResponse> {
     const recognizeStream = this.speechClient
       .streamingRecognize({
         config: {
@@ -25,12 +28,15 @@ export class GoogleSTTAdapter implements STTAdapter {
       .on("data", (data) => {
         const result = data.results[0];
         if (result && result.alternatives[0]) {
-          this.publishEvent({
-            type: result.isFinal
-              ? "transcript.final"
-              : "transcript.partial",
-            text: result.alternatives[0].transcript,
-          });
+          this.publishEvent(
+            {
+              type: result.isFinal
+                ? "transcript.final"
+                : "transcript.partial",
+              text: result.alternatives[0].transcript,
+            },
+            sessionId
+          );
         }
       });
 
@@ -43,10 +49,8 @@ export class GoogleSTTAdapter implements STTAdapter {
     // so this async generator will not yield any values.
   }
 
-  private publishEvent(event: object) {
-    // In a real implementation, you would need the session ID to publish
-    // to the correct channel. This would need to be passed into the stream method.
-    const channel = `session:some-session-id:events`;
+  private publishEvent(event: object, sessionId: string) {
+    const channel = `session:${sessionId}:events`;
     this.redisPublisher.publish(channel, JSON.stringify(event));
   }
 
